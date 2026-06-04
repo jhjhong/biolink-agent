@@ -10,8 +10,8 @@ A **multi-agent AI platform** for biomedical and genomic research. BioLink Agent
 
 ## ✨ Features
 
-- **Multi-Agent Architecture**: A `CoordinatorAgent` routes tasks to domain-specialized agents (Literature, Variant, Genomics, Pathway, Protein, Disease, and more).
-- **Pluggable Scientific Tools**: Supports PubMed, NCBI ClinVar, and extensible tool interfaces.
+- **Multi-Agent Architecture**: A `CoordinatorAgent` routes tasks to domain-specialized agents (Literature, Variant, Genomics, Pathway, Protein, Disease, dbSNP, and more).
+- **Pluggable Scientific Tools**: Supports PubMed, NCBI ClinVar, dbSNP, Ensembl, UniProt, and 10+ extensible tool interfaces.
 - **Universal LLM Adapter**: Works with Google Gemini, OpenAI, and Anthropic Claude.
 - **Async Database Logging**: SQLite-based evidence tracking via SQLAlchemy + aiosqlite.
 - **REST API**: FastAPI backend with OpenAPI docs at `/docs`.
@@ -65,22 +65,89 @@ The API will be available at **http://localhost:8000**
 
 Submit a natural language biomedical question.
 
-**Request:**
-```json
-{
-  "question": "What are the known pathogenic variants in BRCA1?",
-  "language": "en"
-}
-```
+**Request body:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `query` | string | Natural language question (English or Traditional Chinese) |
 
 **Response:**
-```json
-{
-  "answer": "...",
-  "plan": [...],
-  "evidence": [...]
-}
+| Field | Type | Description |
+|-------|------|-------------|
+| `answer` | string | Synthesized answer with evidence |
+| `plan` | array | Agent execution plan (which agents were invoked) |
+| `evidence_collected` | integer | Number of evidence pieces gathered |
+
+---
+
+## 💡 Usage Examples
+
+### Via `curl`
+
+```bash
+# Look up a gene across multiple databases
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What are the pathogenic variants in BRCA1 and their clinical significance?"}'
+
+# Query by rsID
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Tell me about rs7412 in dbSNP"}'
+
+# Traditional Chinese query
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "EGFR 基因有哪些已知的藥物靶點？"}'
 ```
+
+### Via Python
+
+```python
+import httpx
+
+response = httpx.post(
+    "http://localhost:8000/api/query",
+    json={"query": "What is the allele frequency of rs7412 in global populations?"}
+)
+result = response.json()
+print(result["answer"])
+```
+
+### Example Natural Language Queries
+
+| Query Type | Example |
+|------------|---------|
+| **Gene overview** | `What are the genomic coordinates of TP53 in Ensembl and its protein length in UniProt?` |
+| **Variant lookup** | `rs7412 — variant type, gene, and allele frequency` |
+| **VCF coordinate** | `What variant is at chr8:19962213 C>T in dbSNP?` |
+| **Clinical variants** | `What pathogenic BRCA1 variants are in ClinVar?` |
+| **Drug targets** | `What drugs target EGFR? Check GWAS and DGIdb` |
+| **Protein structure** | `Fetch the AlphaFold structure for TP53 and summarize its domains` |
+| **Pathway** | `Which Reactome pathways involve KRAS?` |
+| **Expression** | `In which tissues is BRCA2 most highly expressed? (Human Protein Atlas)` |
+| **Literature** | `Recent PubMed papers on CRISPR treatment of sickle cell disease` |
+| **繁體中文** | `查詢 BRCA1 在不同組織的表現量，以及與它有交互作用的蛋白質` |
+
+### Agent Routing
+
+The `CoordinatorAgent` automatically selects the right agent(s) for each query:
+
+| Agent | Databases | Triggered by |
+|-------|-----------|---------------|
+| `LiteratureAgent` | PubMed | Paper/publication queries |
+| `VariantAgent` | ClinVar | Pathogenicity, ACMG classification |
+| `DbSNPAgent` | dbSNP | rsIDs, SNP/indel lookups, VCF coords |
+| `GenomicsAgent` | Ensembl | Gene coordinates, transcripts |
+| `ProteinAgent` | UniProt, AlphaFold | Protein sequence, structure |
+| `StructureAgent` | RCSB PDB | 3D structure, PDB entries |
+| `PathwayAgent` | Reactome | Biological pathways |
+| `ExpressionAgent` | Human Protein Atlas | Tissue expression |
+| `InteractionAgent` | STRING DB | Protein-protein interactions |
+| `OntologyAgent` | QuickGO | Gene Ontology terms |
+| `ChemAgent` | PubChem, ChEMBL | Chemical compounds, drugs |
+| `PharmacogenomicsAgent` | DGIdb | Drug-gene interactions |
+| `DiseaseAgent` | GWAS Catalog | Disease associations |
+| `TaxonomyAgent` | NCBI Taxonomy | Species classification |
 
 ## ⚙️ Configuration
 

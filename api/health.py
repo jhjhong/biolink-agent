@@ -20,7 +20,8 @@ PING_ENDPOINTS = {
     "PubChem": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2244/property/MolecularWeight/JSON",
     "ChEMBL": "https://www.ebi.ac.uk/chembl/api/data/status?format=json",
     "DGIdb": "https://dgidb.org/api/v2/interactions.json?genes=EGFR",
-    "NCBI Taxonomy": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/einfo.fcgi?db=taxonomy"
+    "NCBI Taxonomy": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/einfo.fcgi?db=taxonomy",
+    "dbSNP": "https://api.ncbi.nlm.nih.gov/variation/v0/refsnp/7412"
 }
 
 # Global state to store the latest health check results

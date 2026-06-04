@@ -14,6 +14,7 @@ from agents.structure_agent import StructureAgent
 from agents.pharmacogenomics_agent import PharmacogenomicsAgent
 from agents.disease_agent import DiseaseAgent
 from agents.taxonomy_agent import TaxonomyAgent
+from agents.dbsnp_agent import DbSNPAgent
 from database.connection import AsyncSessionLocal
 from database.models import QueryLog
 import json
@@ -37,6 +38,7 @@ def get_coordinator():
     pharma_agent = PharmacogenomicsAgent()
     disease_agent = DiseaseAgent()
     tax_agent = TaxonomyAgent()
+    dbsnp_agent = DbSNPAgent()
     
     coordinator.register_agent(lit_agent)
     coordinator.register_agent(var_agent)
@@ -51,6 +53,7 @@ def get_coordinator():
     coordinator.register_agent(pharma_agent)
     coordinator.register_agent(disease_agent)
     coordinator.register_agent(tax_agent)
+    coordinator.register_agent(dbsnp_agent)
     return coordinator
 
 @router.post("/query", response_model=QueryResponse)
