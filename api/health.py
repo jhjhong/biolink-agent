@@ -32,7 +32,7 @@ HEALTH_STATE = {
 
 async def ping_service(client: httpx.AsyncClient, name: str, url: str) -> dict:
     try:
-        response = await client.get(url, timeout=10.0) # 10s timeout to avoid false negatives
+        response = await client.get(url, timeout=20.0) # 10s timeout to avoid false negatives
         if response.status_code < 500:
             return {name: "online"}
         return {name: "offline"}
