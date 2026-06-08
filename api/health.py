@@ -30,14 +30,20 @@ HEALTH_STATE = {
     "databases": {}
 }
 
-async def ping_service(client: httpx.AsyncClient, name: str, url: str) -> dict:
-    try:
-        response = await client.get(url, timeout=20.0) # 10s timeout to avoid false negatives
-        if response.status_code < 500:
-            return {name: "online"}
-        return {name: "offline"}
-    except Exception:
-        return {name: "offline"}
+async def ping_service(client: httpx.AsyncClient, name: str, url: str, max_retries: int = 3) -> dict:
+    for attempt in range(max_retries):
+        try:
+            response = await client.get(url, timeout=20.0) # 20s timeout to avoid false negatives
+            if response.status_code < 500:
+                return {name: "online"}
+        except Exception:
+            pass
+        
+        # If it failed and we haven't reached max retries, wait before retrying
+        if attempt < max_retries - 1:
+            await asyncio.sleep(5) # Wait 5 seconds between retries
+            
+    return {name: "offline"}
 
 async def background_health_check():
     """Background task to periodically check database health without blocking API calls."""
