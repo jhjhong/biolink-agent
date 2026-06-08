@@ -1,0 +1,12 @@
+venv
+__pycache__
+*.pyc
+.env*
+!.env.example
+.git
+.pytest_cache
+science_agent.db
+Dockerfile
+.dockerignore
+README.md
+README_zh.md
