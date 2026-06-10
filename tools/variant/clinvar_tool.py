@@ -46,10 +46,15 @@ class ClinVarTool(ScientificTool):
                 result_uids = summary_data.get("result", {}).get("uids", [])
                 for uid in result_uids:
                     doc = summary_data["result"][uid]
+                    sig = doc.get("clinical_significance", {}).get("description")
+                    if not sig:
+                        sig = doc.get("germline_classification", {}).get("description", "Unknown")
+                        
                     variants.append({
-                        "clinvar_id": uid,
-                        "title": doc.get("title"),
-                        "clinical_significance": doc.get("clinical_significance", {}).get("description", "Unknown"),
+                        "clinvar_uid": uid,
+                        "accession": doc.get("accession_version") or doc.get("accession", ""),
+                        "title": doc.get("title", ""),
+                        "clinical_significance": sig,
                         "genes": doc.get("genes", []),
                         "traits": doc.get("trait_set", [])
                     })

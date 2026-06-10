@@ -16,7 +16,8 @@ from agents.disease_agent import DiseaseAgent
 from agents.taxonomy_agent import TaxonomyAgent
 from agents.dbsnp_agent import DbSNPAgent
 from database.connection import AsyncSessionLocal
-from database.models import QueryLog
+from database.models import QueryLog, Conversation, User, UserSetting
+from core.llm_provider import LLMProvider
 import json
 
 router = APIRouter()
@@ -57,7 +58,6 @@ def get_coordinator():
     return coordinator
 
 from sqlalchemy.future import select
-from database.models import User, UserSetting, QueryLog
 from core.context import request_api_keys
 from api.models import UserSettingsRequest
 
@@ -86,9 +86,26 @@ async def process_query(request: QueryRequest, coordinator: CoordinatorAgent = D
     # 1. Execute agent workflow
     result = await coordinator.execute_workflow(request.query)
     
-    # 2. Log request and result to Database
+    # 2. Handle Conversation and Log Request
+    conversation_id = request.conversation_id
+    
     async with AsyncSessionLocal() as session:
+        if not conversation_id:
+            # Create a new conversation and generate a title
+            llm = LLMProvider()
+            title = await llm.generate_title(request.query)
+            
+            new_conv = Conversation(
+                user_email=request.user_email,
+                title=title
+            )
+            session.add(new_conv)
+            await session.commit()
+            await session.refresh(new_conv)
+            conversation_id = new_conv.id
+            
         log_entry = QueryLog(
+            conversation_id=conversation_id,
             user_email=request.user_email,
             user_query=request.query,
             plan=json.dumps(result["plan"], ensure_ascii=False),
@@ -96,13 +113,22 @@ async def process_query(request: QueryRequest, coordinator: CoordinatorAgent = D
             final_answer=result["final_answer"]
         )
         session.add(log_entry)
+        
+        # Optionally update conversation's updated_at
+        if conversation_id:
+            res = await session.execute(select(Conversation).where(Conversation.id == conversation_id))
+            conv = res.scalars().first()
+            if conv:
+                conv.updated_at = log_entry.created_at
+                
         await session.commit()
     
     # 3. Return JSON response
     return QueryResponse(
         answer=result["final_answer"],
         plan=result["plan"],
-        evidence_collected=result["evidence_collected"]
+        evidence_collected=result["evidence_collected"],
+        conversation_id=conversation_id
     )
 
 @router.get("/settings/{email}")
@@ -151,38 +177,47 @@ async def update_settings(request: UserSettingsRequest):
 async def get_history(email: str):
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(QueryLog)
-            .where(QueryLog.user_email == email)
-            .order_by(QueryLog.created_at.desc())
+            select(Conversation)
+            .where(Conversation.user_email == email)
+            .order_by(Conversation.updated_at.desc())
             .limit(50)
         )
-        logs = result.scalars().all()
-        return [{"id": log.id, "query": log.user_query, "created_at": log.created_at} for log in logs]
+        conversations = result.scalars().all()
+        return [{"id": c.id, "title": c.title, "created_at": c.created_at, "updated_at": c.updated_at} for c in conversations]
 
-@router.get("/history/chat/{log_id}")
-async def get_chat_history(log_id: int):
+@router.get("/history/chat/{conversation_id}")
+async def get_chat_history(conversation_id: int):
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(QueryLog).where(QueryLog.id == log_id))
-        log = result.scalars().first()
-        if not log:
+        result = await session.execute(
+            select(QueryLog)
+            .where(QueryLog.conversation_id == conversation_id)
+            .order_by(QueryLog.created_at.asc())
+        )
+        logs = result.scalars().all()
+        
+        if not logs:
             raise HTTPException(status_code=404, detail="Chat history not found")
         
-        # Parse plan back into objects
-        try:
-            plan = json.loads(log.plan) if log.plan else []
-        except:
-            plan = []
+        history_list = []
+        for log in logs:
+            # Parse plan back into objects
+            try:
+                plan = json.loads(log.plan) if log.plan else []
+            except:
+                plan = []
+                
+            try:
+                evidence = json.loads(log.evidence) if log.evidence else []
+            except:
+                evidence = []
+                
+            history_list.append({
+                "id": log.id,
+                "query": log.user_query,
+                "created_at": log.created_at,
+                "answer": log.final_answer,
+                "plan": plan,
+                "evidence_collected": len(evidence) if isinstance(evidence, list) else 0
+            })
             
-        try:
-            evidence = json.loads(log.evidence) if log.evidence else []
-        except:
-            evidence = []
-            
-        return {
-            "id": log.id,
-            "query": log.user_query,
-            "created_at": log.created_at,
-            "answer": log.final_answer,
-            "plan": plan,
-            "evidence_collected": len(evidence) if isinstance(evidence, list) else 0
-        }
+        return history_list
