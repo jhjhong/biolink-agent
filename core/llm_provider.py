@@ -22,10 +22,13 @@ class LLMProvider:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
     async def _call_gemini(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        if not settings.GEMINI_API_KEY:
-            return "Error: GEMINI_API_KEY not set in .env"
+        from core.context import request_api_keys
+        user_keys = request_api_keys.get({})
+        api_key = kwargs.get("api_key") or user_keys.get("GEMINI_API_KEY")
+        if not api_key:
+            return "⚠️ **系統提示**：請先前往 Settings 設定您的 Gemini API Key！"
             
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
         
         # Convert standard messages to Gemini format
         gemini_contents = []
@@ -36,26 +39,40 @@ class LLMProvider:
             
         payload = {"contents": gemini_contents}
         
+        import asyncio
         async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(url, json=payload, timeout=30.0)
-                response.raise_for_status()
-                data = response.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 429:
-                    return "⚠️ **系統提示**：您的 Gemini API 免費額度已經耗盡 (Rate Limit / Quota Exceeded)。請稍後再試，或是更換一組新的 API Key。"
-                return f"⚠️ **Gemini API 發生錯誤**：無法取得回應 (HTTP {e.response.status_code})。"
-            except Exception as e:
-                return f"⚠️ **Gemini 連線錯誤**：{str(e)}"
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(url, json=payload, timeout=30.0)
+                    response.raise_for_status()
+                    data = response.json()
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code in [500, 502, 503, 504]:
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2 ** attempt)
+                            continue
+                        return f"⚠️ **Gemini API 發生錯誤**：伺服器目前過載或暫時無法回應 (HTTP {e.response.status_code})。請稍後再試。"
+                    if e.response.status_code == 429:
+                        return "⚠️ **系統提示**：您的 Gemini API 免費額度已經耗盡 (Rate Limit / Quota Exceeded)。請稍後再試，或是更換一組新的 API Key。"
+                    return f"⚠️ **Gemini API 發生錯誤**：無法取得回應 (HTTP {e.response.status_code})。"
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                    return f"⚠️ **Gemini 連線錯誤**：{str(e)}"
 
     async def _call_openai(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        if not settings.OPENAI_API_KEY:
-            return "Error: OPENAI_API_KEY not set in .env"
+        from core.context import request_api_keys
+        user_keys = request_api_keys.get({})
+        api_key = kwargs.get("api_key") or user_keys.get("OPENAI_API_KEY")
+        if not api_key:
+            return "⚠️ **系統提示**：請先前往 Settings 設定您的 OpenAI API Key！"
             
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         payload = {
@@ -77,12 +94,15 @@ class LLMProvider:
                 return f"⚠️ **OpenAI 連線錯誤**：{str(e)}"
 
     async def _call_anthropic(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        if not settings.ANTHROPIC_API_KEY:
-            return "Error: ANTHROPIC_API_KEY not set in .env"
+        from core.context import request_api_keys
+        user_keys = request_api_keys.get({})
+        api_key = kwargs.get("api_key") or user_keys.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return "⚠️ **系統提示**：請先前往 Settings 設定您的 Anthropic API Key！"
             
         url = "https://api.anthropic.com/v1/messages"
         headers = {
-            "x-api-key": settings.ANTHROPIC_API_KEY,
+            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "content-type": "application/json"
         }
