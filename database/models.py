@@ -18,10 +18,20 @@ class UserSetting(Base):
     db_configs = Column(Text, default="{}") # Store as JSON string
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class Conversation(Base):
+    __tablename__ = "conversations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String, index=True)
+    title = Column(String, default="New Conversation")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class QueryLog(Base):
     __tablename__ = "query_logs"
 
     id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
     user_email = Column(String, index=True, nullable=True) # Optional for backward compatibility
     user_query = Column(String, index=True)
     language = Column(String, nullable=True)

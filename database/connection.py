@@ -13,5 +13,11 @@ Base = declarative_base()
 
 async def init_db():
     """Initializes the database and creates all tables."""
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            # Backward-compatible migration to add conversation_id to existing DB
+            await conn.execute(text("ALTER TABLE query_logs ADD COLUMN conversation_id INTEGER REFERENCES conversations(id)"))
+        except Exception:
+            pass
