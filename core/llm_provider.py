@@ -6,7 +6,9 @@ class LLMProvider:
     """Unified adapter for calling different LLM APIs."""
     
     def __init__(self, provider: str = None):
-        self.provider = provider or settings.DEFAULT_LLM_PROVIDER
+        from core.context import request_api_keys
+        user_keys = request_api_keys.get({})
+        self.provider = provider or user_keys.get("PREFERRED_PROVIDER") or settings.DEFAULT_LLM_PROVIDER
         
     async def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
         """
@@ -21,6 +23,21 @@ class LLMProvider:
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
+    async def generate_title(self, query: str, **kwargs) -> str:
+        """Generates a short, 3-5 word title for a conversation based on the first query."""
+        prompt = f"Please generate a very short, concise title (maximum 5 words) that summarizes the following query. Do not include quotes or punctuation at the end. The title should reflect the language of the query.\n\nQuery: {query}"
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            title = await self.chat(messages, **kwargs)
+            # Clean up the title (sometimes LLMs add quotes or newlines)
+            title = title.replace('"', '').replace("'", '').strip()
+            if len(title) > 50:
+                title = title[:47] + "..."
+            return title
+        except Exception as e:
+            print(f"Failed to generate title: {e}")
+            return "New Conversation"
+
     async def _call_gemini(self, messages: List[Dict[str, str]], **kwargs) -> str:
         from core.context import request_api_keys
         user_keys = request_api_keys.get({})
@@ -28,7 +45,8 @@ class LLMProvider:
         if not api_key:
             return "⚠️ **系統提示**：請先前往 Settings 設定您的 Gemini API Key！"
             
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+        model = kwargs.get("model") or user_keys.get("PREFERRED_MODEL_GEMINI") or "gemini-3.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         
         # Convert standard messages to Gemini format
         gemini_contents = []
@@ -76,7 +94,7 @@ class LLMProvider:
             "Content-Type": "application/json"
         }
         payload = {
-            "model": kwargs.get("model", "gpt-4-turbo"),
+            "model": kwargs.get("model") or user_keys.get("PREFERRED_MODEL_OPENAI") or "gpt-4-turbo",
             "messages": messages
         }
         
@@ -116,7 +134,7 @@ class LLMProvider:
                 anthropic_messages.append({"role": msg["role"], "content": msg["content"]})
                 
         payload = {
-            "model": kwargs.get("model", "claude-3-5-sonnet-20241022"),
+            "model": kwargs.get("model") or user_keys.get("PREFERRED_MODEL_ANTHROPIC") or "claude-3-5-sonnet-20241022",
             "max_tokens": 4096,
             "system": system_prompt,
             "messages": anthropic_messages
