@@ -1,5 +1,6 @@
 import httpx
 import asyncio
+import time
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -30,11 +31,15 @@ HEALTH_STATE = {
     "databases": {}
 }
 
-async def ping_service(client: httpx.AsyncClient, name: str, url: str, max_retries: int = 3) -> dict:
+async def ping_service(client: httpx.AsyncClient, name: str, url: str, max_retries: int = 3, timeout: float = 40.0) -> dict:
     for attempt in range(max_retries):
         try:
-            response = await client.get(url, timeout=20.0) # 20s timeout to avoid false negatives
+            start_time = time.time()
+            response = await client.get(url, timeout=timeout)
+            elapsed = time.time() - start_time
             if response.status_code < 500:
+                if elapsed > 20.0:
+                    return {name: "degraded"}
                 return {name: "online"}
         except Exception:
             pass
@@ -45,9 +50,40 @@ async def ping_service(client: httpx.AsyncClient, name: str, url: str, max_retri
             
     return {name: "offline"}
 
+async def quick_health_check():
+    """Fast initial health check on startup (10s timeout, no retries).
+    This ensures HEALTH_STATE is populated quickly so the frontend
+    receives real status data on the first request.
+    """
+    global HEALTH_STATE
+    try:
+        results = {}
+        async with httpx.AsyncClient() as client:
+            tasks = [
+                ping_service(client, name, url, max_retries=1, timeout=10.0)
+                for name, url in PING_ENDPOINTS.items()
+            ]
+            completed = await asyncio.gather(*tasks)
+            for res in completed:
+                results.update(res)
+        
+        is_healthy = all(status == "online" for status in results.values())
+        HEALTH_STATE["status"] = "healthy" if is_healthy else "degraded"
+        HEALTH_STATE["databases"] = results
+        print(f"Quick health check completed: {results}")
+    except Exception as e:
+        print(f"Quick health check failed: {e}")
+
 async def background_health_check():
-    """Background task to periodically check database health without blocking API calls."""
+    """Background task to periodically check database health without blocking API calls.
+    Runs a quick check immediately on startup, then a full check every 30 minutes.
+    """
+    # First: fast check so the frontend gets real data quickly
+    await quick_health_check()
+    
     while True:
+        # Wait for 30 minutes before the next full check
+        await asyncio.sleep(1800)
         try:
             results = {}
             async with httpx.AsyncClient() as client:
@@ -62,9 +98,6 @@ async def background_health_check():
             print("Background health check completed.")
         except Exception as e:
             print(f"Background health check failed: {e}")
-            
-        # Wait for 30 minutes (1800 seconds) before the next check
-        await asyncio.sleep(1800)
 
 @router.get("/health")
 async def health_check():
