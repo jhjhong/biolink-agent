@@ -162,12 +162,8 @@ Copy `.env.example` to `.env` and configure:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feat/your-feature`)
-3. Commit your changes following [Conventional Commits](https://www.conventionalcommits.org/)
-4. Open a Pull Request
+Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
 
 ## 📄 License
 
-MIT License — see [LICENSE](./LICENSE) for details.
+Apache 2.0 License — see [LICENSE](./LICENSE) for details.
