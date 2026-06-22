@@ -15,6 +15,7 @@ from agents.pharmacogenomics_agent import PharmacogenomicsAgent
 from agents.disease_agent import DiseaseAgent
 from agents.taxonomy_agent import TaxonomyAgent
 from agents.dbsnp_agent import DbSNPAgent
+from agents.gnomad_agent import GnomadAgent
 from database.connection import AsyncSessionLocal
 from database.models import QueryLog, Conversation, User, UserSetting
 from core.llm_provider import LLMProvider
@@ -40,6 +41,7 @@ def get_coordinator():
     disease_agent = DiseaseAgent()
     tax_agent = TaxonomyAgent()
     dbsnp_agent = DbSNPAgent()
+    gnomad_agent = GnomadAgent()
     
     coordinator.register_agent(lit_agent)
     coordinator.register_agent(var_agent)
@@ -55,6 +57,7 @@ def get_coordinator():
     coordinator.register_agent(disease_agent)
     coordinator.register_agent(tax_agent)
     coordinator.register_agent(dbsnp_agent)
+    coordinator.register_agent(gnomad_agent)
     return coordinator
 
 from sqlalchemy.future import select
