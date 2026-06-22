@@ -1,6 +1,6 @@
 # 🧬 BioLink Agent
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
 
@@ -162,12 +162,8 @@ print(result["answer"])
 
 ## 🤝 參與貢獻
 
-歡迎任何形式的貢獻！請：
-1. Fork 此 repo
-2. 建立功能分支（`git checkout -b feat/your-feature`）
-3. 提交 commit，遵循 [Conventional Commits](https://www.conventionalcommits.org/)
-4. 發送 Pull Request
+歡迎任何形式的貢獻！請閱讀 [CONTRIBUTING.md](./CONTRIBUTING.md) 以了解我們的行為準則以及提交 Pull Request 的流程。
 
 ## 📄 授權條款
 
-MIT License — 詳見 [LICENSE](./LICENSE)。
+Apache 2.0 License — 詳見 [LICENSE](./LICENSE)。
