@@ -86,35 +86,53 @@ async def process_query(request: QueryRequest, coordinator: CoordinatorAgent = D
                 except:
                     pass
 
-    # 1. Check for Zero-Token Cache (Exact Match)
+    # 1. Fetch History if conversation_id is provided
+    history_messages = []
+    if request.conversation_id:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(QueryLog)
+                .where(QueryLog.conversation_id == request.conversation_id)
+                .order_by(QueryLog.created_at.asc())
+            )
+            logs = result.scalars().all()
+            for log in logs:
+                history_messages.append({"role": "user", "content": log.user_query})
+                if log.final_answer:
+                    history_messages.append({"role": "assistant", "content": log.final_answer})
+
+    # 2. Check for Zero-Token Cache (Exact Match)
     cached_result = None
-    async with AsyncSessionLocal() as session:
-        # We look for the most recent successful query matching the exact string
-        cache_check = await session.execute(
-            select(QueryLog)
-            .where(QueryLog.user_query == request.query)
-            .where(QueryLog.final_answer != None)
-            .order_by(QueryLog.created_at.desc())
-            .limit(1)
-        )
-        cached_log = cache_check.scalars().first()
-        if cached_log:
-            print(f"-> [Cache Hit] Found identical query from {cached_log.created_at}")
-            try:
-                cached_result = {
-                    "plan": json.loads(cached_log.plan) if cached_log.plan else [],
-                    "evidence": json.loads(cached_log.evidence) if cached_log.evidence else [],
-                    "final_answer": cached_log.final_answer
-                }
-                cached_result["evidence_collected"] = len(cached_result["evidence"]) if isinstance(cached_result["evidence"], list) else 0
-            except json.JSONDecodeError:
-                cached_result = None
+    # We only use exact-match caching if there is no conversation history.
+    # Otherwise, context matters and caching identical strings could lead to wrong answers.
+    if not history_messages:
+        async with AsyncSessionLocal() as session:
+            # We look for the most recent successful query matching the exact string
+            cache_check = await session.execute(
+                select(QueryLog)
+                .where(QueryLog.user_query == request.query)
+                .where(QueryLog.final_answer != None)
+                .order_by(QueryLog.created_at.desc())
+                .limit(1)
+            )
+            cached_log = cache_check.scalars().first()
+            if cached_log:
+                print(f"-> [Cache Hit] Found identical query from {cached_log.created_at}")
+                try:
+                    cached_result = {
+                        "plan": json.loads(cached_log.plan) if cached_log.plan else [],
+                        "evidence": json.loads(cached_log.evidence) if cached_log.evidence else [],
+                        "final_answer": cached_log.final_answer
+                    }
+                    cached_result["evidence_collected"] = len(cached_result["evidence"]) if isinstance(cached_result["evidence"], list) else 0
+                except json.JSONDecodeError:
+                    cached_result = None
 
     if cached_result:
         result = cached_result
     else:
-        # 1.5 Execute agent workflow if no cache
-        result = await coordinator.execute_workflow(request.query)
+        # 3. Execute agent workflow if no cache
+        result = await coordinator.execute_workflow(request.query, history=history_messages)
 
     # 2. Handle Conversation and Log Request
     conversation_id = request.conversation_id

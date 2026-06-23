@@ -13,7 +13,7 @@ class CoordinatorAgent:
     def register_agent(self, agent: BaseAgent):
         self.agents[agent.name] = agent
 
-    async def analyze_intent_and_plan(self, user_query: str) -> List[Dict[str, str]]:
+    async def analyze_intent_and_plan(self, user_query: str, history: List[Dict[str, str]] = None) -> List[Dict[str, str]]:
         """Uses LLM to determine which agents need to be called and in what order."""
         available_agents = "\n".join([f"- {name}: {agent.description}" for name, agent in self.agents.items()])
         
@@ -36,10 +36,12 @@ Return ONLY a valid JSON array. For example:
   {{"agent": "LiteratureAgent", "query": "TP53 lung cancer"}}
 ]
 """
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_query}
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        if history:
+            messages.extend(history)
+            
+        messages.append({"role": "user", "content": user_query})
         
         response_text = await self.llm.chat(messages)
         
@@ -58,7 +60,7 @@ Return ONLY a valid JSON array. For example:
             print(f"Failed to parse plan: {clean_text}")
             return []
 
-    async def synthesize_final_answer(self, user_query: str, evidence: List[Dict[str, Any]]) -> str:
+    async def synthesize_final_answer(self, user_query: str, evidence: List[Dict[str, Any]], history: List[Dict[str, str]] = None) -> str:
         """Synthesize the collected evidence into a final cited answer."""
         evidence_text = json.dumps(evidence, indent=2, ensure_ascii=False)
         
@@ -79,17 +81,19 @@ Evidence Collected:
 
 Please provide a comprehensive answer.
 """
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        if history:
+            messages.extend(history)
+            
+        messages.append({"role": "user", "content": user_prompt})
         
         return await self.llm.chat(messages)
 
-    async def execute_workflow(self, user_query: str) -> Dict[str, Any]:
+    async def execute_workflow(self, user_query: str, history: List[Dict[str, str]] = None) -> Dict[str, Any]:
         """Main entry point for handling a user query."""
         print("-> [Coordinator] Analyzing intent and planning tasks...")
-        plan = await self.analyze_intent_and_plan(user_query)
+        plan = await self.analyze_intent_and_plan(user_query, history)
         
         evidence = []
         for task in plan:
@@ -104,7 +108,7 @@ Please provide a comprehensive answer.
                 print(f"-> [Coordinator] Warning: Agent {agent_name} not found.")
                 
         print("-> [Coordinator] Synthesizing final answer based on collected evidence...")
-        final_answer = await self.synthesize_final_answer(user_query, evidence)
+        final_answer = await self.synthesize_final_answer(user_query, evidence, history)
         
         return {
             "plan": plan,
