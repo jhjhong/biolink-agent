@@ -8,6 +8,11 @@ router = APIRouter()
 # Lightweight ping endpoints to avoid rate limits and large payloads
 PING_ENDPOINTS = {
     "PubMed": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/einfo.fcgi?db=pubmed",
+    "arXiv": "http://export.arxiv.org/api/query?search_query=all:electron&max_results=1",
+    "bioRxiv": "https://api.crossref.org/works?filter=prefix:10.1101&rows=1",
+    "Europe PMC": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=test&format=json&resultType=lite&pageSize=1",
+    "OpenAlex": "https://api.openalex.org/works?per-page=1",
+    "NCBI Sequence": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/einfo.fcgi?db=nuccore",
     "Ensembl": "https://rest.ensembl.org/info/ping?content-type=application/json",
     "UniProt": "https://rest.uniprot.org/uniprotkb/search?query=TP53&size=0",
     "AlphaFold": "https://alphafold.ebi.ac.uk/api/prediction/P04637",
