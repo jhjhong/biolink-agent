@@ -149,6 +149,41 @@ The `CoordinatorAgent` automatically selects the right agent(s) for each query:
 | `DiseaseAgent` | GWAS Catalog | Disease associations |
 | `TaxonomyAgent` | NCBI Taxonomy | Species classification |
 
+## 🤖 MCP Integration
+
+BioLink-Agent supports the **Model Context Protocol (MCP)**, allowing you to mount it as a tool in MCP-compatible clients like Claude Desktop or Cursor. This exposes a single `ask_biolink` tool that handles task planning, sub-agent routing, and evidence gathering.
+
+### Running the MCP Server
+
+```bash
+# Ensure dependencies are installed
+pip install -r requirements.txt
+
+# You can run it directly (stdio transport)
+python mcp_server.py
+```
+
+### Claude Desktop Configuration
+
+Add the following to your `claude_desktop_config.json` (usually located at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "biolink": {
+      "command": "python",
+      "args": ["/absolute/path/to/biolink-agent/mcp_server.py"],
+      "env": {
+        "GEMINI_API_KEY": "your_api_key_here",
+        "OPENAI_API_KEY": "optional_api_key"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop, and you can now ask it biomedical questions directly. Claude will use the `ask_biolink` tool to fetch real-world data and synthesize answers!
+
 ## ⚙️ Configuration
 
 Copy `.env.example` to `.env` and configure:
